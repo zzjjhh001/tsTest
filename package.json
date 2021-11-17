@@ -1,0 +1,22 @@
+{
+  "name": "ts-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzjjhh001/tsTest.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zzjjhh001/tsTest/issues"
+  },
+  "homepage": "https://github.com/zzjjhh001/tsTest#readme",
+  "devDependencies": {
+    "@types/node": "^16.11.4"
+  }
+}
