@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>药企账号管理</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="https://i2.hdfimg.com/ssi/css/element-ui@2.9.1.min.css">
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+
+        .e-page {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .d-tit {
+            text-align: center;
+            font-size: 20px;
+            margin: 15px 0px;
+        }
+
+        .d-form {
+            text-align: center;
+        }
+	.select-companyType{
+            text-align: center;
+    	}
+    	.select-companyType h4{
+            margin-top: 0;
+            font-size: 18px;
+    	}
+    	.companyType{
+            margin-bottom: 20px;
+    	}
+    	.type-item {
+       	     width: 156px;
+       	     border: none;
+             padding: 20px 0;
+       	     background: #F2F2F2;
+   	 }
+   	 .type-item+.type-item{
+       	     margin-left: 70px;
+   	 }
+    </style>
+</head>
+<body>
+<div id="app" style="width: 1200px;margin: 0 auto 30px">
+    <div class="d-tit">机构和企业账号管理</div>
+    <!--搜索条件-->
+    <div class="d-form">
+        <el-form :inline="true" @submit.native.prevent @keyup.enter.native="onSubmit">
+            <el-form-item label="账号名称">
+                <el-input v-model="companyName" placeholder="请输入账号名称"></el-input>
+            </el-form-item>
+            <el-form-item label="用户名">
+                <el-input v-model="accountName" placeholder="请输入用户名"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="onSubmit">搜索</el-button>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="handleCreateAccount">新建账号</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+    <!-- 创建企业账号弹出框-->
+    <el-dialog title="创建机构/企业账号" :visible.sync="dialogVisible">
+        <div v-show="createStep === 1" class="select-companyType">
+                <h4>请选择账号主体身份</h4>
+                <div class="companyType">
+                    <el-button @click="handleSelectType(1)" class="type-item">企业、非医院机构</el-button>
+                    <el-button @click="handleSelectType(2)" class="type-item">医院</el-button>
+                </div>
+         </div>
+	<el-form v-show="createStep === 2" :model="newAccount" label-width="110px">
+            <el-form-item v-if="companyType === 1"  label="机构/企业名称">
+                <el-input v-model="newAccount.company" placeholder="请输入机构/企业名称"></el-input>
+            </el-form-item>
+	    <el-form-item v-if="companyType === 2" label="医院名称">
+                    <el-select
+                        v-model="newAccount.hospitalId"
+                        filterable
+                        remote
+                        @change="handleChange"
+                        reserve-keyword
+                        placeholder="请输入医院名称"
+                        :remote-method="getHospitals"
+                        :loading="loading">
+                        <el-option
+                            v-for="item in hospitalList"
+                            :key="item.matches.id"
+                            :label="item.matches.name"
+                            :value="item.matches.id">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+            <el-form-item label="用户名">
+                <el-input v-model="newAccount.account" placeholder="请输入用户名"></el-input>
+            </el-form-item>
+            <el-form-item label="密码">
+                <el-input v-model="newAccount.password" type="password" placeholder="请输入密码"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="createNewAccount">新建账号</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+    <!-- 账号列表展示 -->
+    <el-table :data="accountList" border stripe style="width: 100%">
+        <el-table-column prop="id" label="账号ID" width="160"></el-table-column>
+        <el-table-column prop="companyName" label="账号名称"></el-table-column>
+        <el-table-column prop="accountName" label="用户名"></el-table-column>
+        <el-table-column prop="ctime" label="创建时间" width="200"></el-table-column>
+        <el-table-column label="操作" width="100">
+            <template slot-scope="scope">
+                <el-button @click="showAlterDialog(scope.row)" type="text">密码重置</el-button>
+            </template>
+        </el-table-column>
+    </el-table>
+    <el-pagination class="e-page" background
+                   layout="total, sizes, prev, pager, next, jumper"
+                   @current-change="changePages"
+                   @size-change="changeSizes"
+                   :hide-on-single-page="singlePage"
+                   :current-page="currentPage"
+                   :page-size="pageSize"
+                   :page-sizes="[10,20,30,50]"
+                   :total="total">
+    </el-pagination>
+
+    <!-- 修改企业密码 -->
+    <el-dialog title="请输入新的密码" :visible.sync="alterAccount.visiable">
+        <el-form label-width="80px" @submit.native.prevent>
+            <el-form-item label="密码">
+                <el-input v-model="alterAccount.password" type="password" placeholder="请输入密码"></el-input>
+            </el-form-item>
+
+            <el-form-item>
+                <el-button @click="alterAccount.visiable = false">取 消</el-button>
+                <el-button type="primary" @click="reset">确定</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+</div>
+<!-- import Vue before Element -->
+<script src="https://i2.hdfimg.com/ssi/js/vue-2.5.16.min.js"></script>
+<!-- import JavaScript -->
+<script src="https://i2.hdfimg.com/ssi/js/element-ui@2.9.1.min.js"></script>
+<script src="https://i2.hdfimg.com/ssi/js/jquery-2.1.4.min.js"></script>
+<script>
+    function isEmpty(obj) {
+        return (typeof obj === 'undefined' || obj === null || obj === "");
+    }
+
+    var app = new Vue({
+        el: '#app',
+        data: {
+            dialogVisible: false, //新建账号弹出框显示状态
+            newAccount: {
+	        hospitalId: [],
+                company: '',
+                account: '',
+                password: ''
+            },
+            alterAccount: {
+                visiable:false,
+                companyId: '',
+                password: ''
+            },
+            singlePage: true,
+            total: 0, //默认数据总数
+            pageSize: 10, //每页的数据条数
+            currentPage: 1, //默认开始页面
+            accountList: [],
+            companyName: '',
+            createStep: 1,
+            companyType: 1,
+            loading: false,
+            hospitalList: [],
+            accountName: ''
+        },
+        mounted() {
+            this.getAccountList()
+        },
+        methods: {
+           handleChange(val){
+                const match = this.hospitalList.filter((item) => {
+                    return item.matches.id === val
+                });
+                if(match.length > 0){
+                    this.newAccount.company = match[0].matches.name;
+                }
+           },
+           handleCreateAccount(){
+                this.createStep = 1;
+                this.newAccount.company = '';
+                this.newAccount.hospitalId = [];
+                this.dialogVisible = true;
+            },
+           getHospitals(name){
+                const query = name.trim();
+                if (query !== '') {
+                    this.loading = true;
+                    $.ajax({
+                        url: '/ndrugcompany/yqmp/searchHospitalLimitNameCommonName',
+                        type: "POST",
+                        data: {
+                            q: query,
+                            limit: 20
+                        },
+                        dataType: 'json',
+                        success: (res) => {
+                            if(+res.errorCode === 0 && res.data){
+                                this.hospitalList = res.data.hits;
+                            }
+                            this.loading = false;
+                        }
+                    });
+                }else{
+                    this.hospitalList = [];
+                }
+            },
+            handleSelectType(type){
+                this.companyType = type;
+                this.createStep = 2;
+            },
+            getAccountList() {
+                var _this = this;
+                $.ajax({
+                    url: '/yqcooperation/ajaxCompanyAccountInfos',
+                    data: {
+                        searchCompanyNname: _this.companyName,
+                        searchAccountName: _this.accountName,
+                        page: _this.currentPage,
+                        limit: _this.pageSize
+                    },
+                    dataType: 'json',
+                    success: function (res) {
+                        if (res.data) {
+                            _this.total = parseInt(res.count);
+                            _this.accountList = res.data;
+                            if (_this.total / _this.pageSize > 1) {
+                                _this.singlePage = false;
+                            }
+                        }
+                    }
+                });
+            },
+            changePages(currentPage) {
+                this.currentPage = currentPage;
+                this.getAccountList();
+            },
+            changeSizes(pageSize) {
+                this.pageSize = pageSize;
+                this.getAccountList();
+            },
+            //密码重置
+            reset(){
+                var _this = this;
+                var passwordPattern = new RegExp('(?=.*[0-9])(?=.*[a-zA-Z]).{6,15}');
+                if (!passwordPattern.test(this.alterAccount.password)) {
+                    this.toast('您的密码复杂度太低（密码中必须包含字母、数字），6-15位 请修改密码！！！');
+                    return false;
+                }
+
+                $.ajax({
+                    url: "ajaxResetPass",
+                    type: "POST",
+                    data: {
+                        accountId:this.alterAccount.accountId,
+                        password:this.alterAccount.password
+                    },
+                    dataType: "json",
+                    success: function (res) {
+                        if (res && res.code == 0) {
+                            _this.toast('密码重置成功')
+                        } else {
+                            _this.toast(res.msg);
+                        }
+                    },
+                    error: function (res) {
+                        alert("系统异常！");
+                    }
+                });
+            },
+            showAlterDialog(row) {
+                this.alterAccount.accountId = row.id;
+                this.alterAccount.visiable = true;
+            },
+            //条件查询
+            onSubmit() {
+                this.currentPage = 1;
+                this.getAccountList();
+            },
+            toast(str) {
+                this.$message({
+                    message: str,
+                    offset: '180',
+                    duration: '1500',
+                    type: 'warning'
+                });
+            },
+            isEmpty(obj) {
+                return (typeof obj === 'undefined' || obj === null || obj === "");
+            },
+
+            //创建企业账号
+            createNewAccount() {
+                var _this = this;
+                var companyName = this.newAccount.company.trim();
+                var accountName = this.newAccount.account.trim();
+                var password = this.newAccount.password.trim();
+		var companyType = this.companyType;
+                var hospitalId = this.newAccount.hospitalId
+                var pattern = /^[0-9a-zA-Z]*$/;
+                if (/(\s)+/g.test(companyName)) {
+                    this.toast('企业名称不能包含空白字符');
+                    return false;
+                }
+                if (/(\s)+/g.test(accountName)) {
+                    this.toast('帐户名称不能包含空白字符');
+                    return false;
+                }
+                if(this.companyType === 2 && !hospitalId){
+                    this.toast('请选择医院');
+                    return false;
+                }
+                if(this.companyType === 1 && this.isEmpty(companyName)){
+                    this.toast('有数据为空，请检查');
+                    return false;
+                }
+                if (this.isEmpty(accountName) || this.isEmpty(password)) {
+                    this.toast('有数据为空，请检查');
+                    return false;
+                }
+                if (!pattern.test(accountName)) {
+                    this.toast('用户名不符合规范, 请校验！！！');
+                    return false;
+                }
+                var passwordPattern = new RegExp('(?=.*[0-9])(?=.*[a-zA-Z]).{6,15}');
+                if (!passwordPattern.test(password)) {
+                    this.toast('您的密码复杂度太低（密码中必须包含字母、数字），6-15位 请修改密码！！！');
+                    return false;
+                }
+                $.ajax({
+                    url: "ajaxCreateCompanyAccount",
+                    type: "POST",
+                    data: {
+                        companyName: companyName,
+                        accountName: accountName,
+                        password: password,
+                        sourceId: hospitalId,
+                        sourceType: companyType
+                    },
+                    dataType: "json",
+                    success: function (res) {
+                        if (res && res.code == 0) {
+                            location.reload();
+                        } else {
+                            _this.toast(res.msg);
+                        }
+                    },
+                    error: function (res) {
+                        alert("系统异常！");
+                    }
+                });
+            }
+        }
+    })
+</script>
+</body>
+</html>
